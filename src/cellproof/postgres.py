@@ -271,6 +271,11 @@ def _rewrite(tree):
         if isinstance(node, exp.Repeat):
             node.set("times", as_int(node.args["times"]))
             return node
+        if isinstance(node, exp.Round) and node.args.get("decimals") is None and not (
+                isinstance(node.this, exp.Cast) and node.this.to.this == exp.DataType.Type.DECIMAL):
+            # Postgres's round(double) rounds ties to even (100.5 -> 100); numeric's, like DuckDB's, away from zero
+            inner = exp.Round(this=exp.Cast(this=node.this, to=exp.DataType.build("NUMERIC")))
+            return exp.Cast(this=inner, to=exp.DataType.build("DOUBLE PRECISION"))
         if isinstance(node, exp.Round) and node.args.get("decimals") is not None and not (
                 isinstance(node.this, exp.Cast) and node.this.to.this == exp.DataType.Type.DECIMAL):
             # Postgres rounds numeric only: decimal rounding at the 15 digits a double casts to, as Excel does

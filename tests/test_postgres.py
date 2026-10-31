@@ -65,3 +65,11 @@ def test_duckdb_substr_semantics_on_postgres(con):
     for a, n in [(3, -1), (3, 0), (0, 2), (-1, 2), (-3, 2), (1, -5), (2, 10), (6, 2), (0, -1), (-10, 3), (2, None)]:
         q = f"SELECT substr('hello', {a}, {n})" if n is not None else f"SELECT substr('hello', {a})"
         assert con.execute(postgres.translate(q)).fetchone()[0] == duckdb.sql(q).fetchall()[0][0], (a, n)
+
+
+def test_rounding_ties_go_away_from_zero_on_postgres(con):
+    # Postgres's round(double) rounds 100.5 to 100 (ties to even); Excel, DuckDB and these cells go away from zero
+    book = book_of({"S": {"A1": ("=ROUND(2.5,0)", 3.0), "A2": ("=ROUND(-2.5,0)", -3.0), "A3": ("=ROUND(1.005,2)", 1.01),
+                          "A4": ("=ROUND(2.675,2)", 2.68), "A5": ("=MROUND(5,2)", 6.0), "A6": ("=ROUND(0.5,0)", 1.0)}})
+    got = {v.key: (v.status, v.actual) for v in postgres.verify(book, compile_book(book), con)}
+    assert {s for s, _ in got.values()} == {"PASS"}, got
