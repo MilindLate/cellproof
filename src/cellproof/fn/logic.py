@@ -4,6 +4,7 @@ The IS functions look at a value without failing: an error in their argument is 
 """
 from __future__ import annotations
 
+from cellproof.expr import bool_num
 from cellproof.expr import NO_ERR, ZERO, Expr, as_bool, compare, error, errs, keep_locale, num, num_strict, pick, unify, unify_all
 from cellproof.functions import arity, logical_args, register
 from cellproof.model import Unsupported, a1
@@ -257,7 +258,7 @@ def n_(c, args, sheet):
     if x.type in ("num", "blank"):
         return num(x)
     if x.type == "bool":
-        return Expr(f"CAST({x.sql} AS DOUBLE)", "num", x.err)
+        return Expr(bool_num(x.sql), "num", x.err)
     if x.type in ("txt", "err"):
         return Expr("CAST(0 AS DOUBLE)", "num", x.err)
     return Expr(f"(CASE WHEN {x.kind} = 's' THEN CAST(0 AS DOUBLE) ELSE {x.sql} END)", "num", x.err)

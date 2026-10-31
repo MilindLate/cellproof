@@ -108,13 +108,18 @@ def _text_error(t: str, n: str) -> str:
     return f"(CASE WHEN {n} IS NULL THEN (CASE WHEN {local} THEN '{LOCALE}' ELSE '#VALUE!' END) END)"
 
 
+def bool_num(b: str) -> str:
+    """TRUE/FALSE as 1.0/0.0, written so DuckDB and Postgres both run it (Postgres has no boolean -> double cast)."""
+    return f"CAST(CAST({b} AS INTEGER) AS DOUBLE)"
+
+
 def num(e: Expr) -> Expr:
     if e.type == "num":
         return e
     if e.type == "blank":
         return ZERO
     if e.type == "bool":
-        return Expr(f"CAST({e.sql} AS DOUBLE)", "num", e.err)
+        return Expr(bool_num(e.sql), "num", e.err)
     if e.type == "err":
         return Expr("CAST(NULL AS DOUBLE)", "num", e.err)
     if e.type == "txt":
@@ -191,7 +196,7 @@ def as_any(e: Expr) -> Expr:
     if e.type == "txt":
         return any_of("'s'", "CAST(NULL AS DOUBLE)", e.sql, e.err)
     if e.type == "bool":
-        return any_of("'b'", f"CAST({e.sql} AS DOUBLE)", "CAST(NULL AS VARCHAR)", e.err)
+        return any_of("'b'", bool_num(e.sql), "CAST(NULL AS VARCHAR)", e.err)
     return any_of("'n'", "CAST(NULL AS DOUBLE)", "CAST(NULL AS VARCHAR)", e.err)  # err
 
 

@@ -8,6 +8,7 @@ the range's size.
 """
 from __future__ import annotations
 
+from cellproof.expr import bool_num
 from cellproof.expr import CELLS, NO_ERR, Expr, errs, lit_str, parse_num, txt, where_area
 from cellproof.functions import arity, note_text_numbers, register
 from cellproof.model import Unsupported
@@ -41,7 +42,7 @@ def match_sql(alias: str, crit: Expr, q: str) -> tuple[str, str, str]:
         return f"COALESCE(({k} = 'n' AND {n} = {crit.sql}) OR ({k} = 's' AND {parse_num(t)} = {crit.sql}), FALSE)", \
             "FALSE", f"(SELECT 1 AS one) {q}"
     if crit.type == "bool":
-        return f"COALESCE({k} = 'b' AND {n} = CAST({crit.sql} AS DOUBLE), FALSE)", "FALSE", f"(SELECT 1 AS one) {q}"
+        return f"COALESCE({k} = 'b' AND {n} = {bool_num(crit.sql)}, FALSE)", "FALSE", f"(SELECT 1 AS one) {q}"
     ops = "(CASE " + " ".join(f"WHEN c LIKE '{o}%' THEN '{o}'" for o in OPS) + " ELSE '' END)"
     parsed = (f"(SELECT op, rhs, {parse_num('rhs')} AS rn, "
               f"(CASE upper(rhs) WHEN 'TRUE' THEN 1.0 WHEN 'FALSE' THEN 0.0 END) AS rb, {like_pattern('rhs')} AS pat "

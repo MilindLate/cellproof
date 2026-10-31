@@ -23,6 +23,9 @@ def main(argv: list[str] | None = None) -> int:
     convert.add_argument("workbook", type=Path)
     convert.add_argument("--out", type=Path, help="output folder (default: <workbook>_dbt next to the file)")
     convert.add_argument("--dbt", action="store_true", help="also run `dbt build` on the result")
+    convert.add_argument("--target", choices=["duckdb", "postgres"], default="duckdb",
+                         help="verify on DuckDB (default) or also on Postgres (needs: pip install cellproof[postgres])")
+    convert.add_argument("--pg-url", help="the Postgres to verify on (default: a Postgres of cellproof's own)")
     args = parser.parse_args(argv)
 
     try:
@@ -44,6 +47,16 @@ def main(argv: list[str] | None = None) -> int:
     for failure in failures:  # those cells are UNRESOLVED in the report; the run goes on
         print(f"error: {failure}", file=sys.stderr)
     out = args.out or args.workbook.with_name(args.workbook.stem + "_dbt")
+    if args.target == "postgres":
+        try:
+            from cellproof import postgres
+            with postgres.connect(args.pg_url) as con:
+                duck = sum(v.status == "PASS" for v in verdicts)
+                verdicts = postgres.verify(book, compiled, con)
+        except ImportError:
+            print("error: the Postgres target needs: pip install cellproof[postgres]", file=sys.stderr)
+            return 2
+        compiled.findings.append(f"verified on Postgres: these verdicts are Postgres's ({duck} cells PASS on DuckDB)")
     write_project(book, compiled, out, args.workbook.stem)
     counts = write_report(verdicts, compiled.findings, out, args.workbook.name, computed, compiled.notes,
                           compiled.chains)

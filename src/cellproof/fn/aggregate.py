@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 
+from cellproof.expr import bool_num
 from cellproof.expr import (BLANK, CELLS, NO_ERR, Expr, errs, lit_str, num, num_text, parse_num, where_area,
                             _text_bool)
 from cellproof.functions import arity, note_text_numbers, register
@@ -202,7 +203,7 @@ def _scalar_element(e: Expr) -> Arr:
     if e.type == "txt":
         return Arr([], "'s'", "CAST(NULL AS DOUBLE)", e.sql, e.err, None)
     if e.type == "bool":
-        return Arr([], "'b'", f"CAST({e.sql} AS DOUBLE)", "CAST(NULL AS VARCHAR)", e.err, None)
+        return Arr([], "'b'", bool_num(e.sql), "CAST(NULL AS VARCHAR)", e.err, None)
     if e.type == "err":
         return Arr([], "'e'", "CAST(NULL AS DOUBLE)", "CAST(NULL AS VARCHAR)", e.err, None)
     if e.type == "any":

@@ -98,7 +98,7 @@ from cellproof.parser import Binary, Num, RefNode  # noqa: E402
 def test_cell_row_drops_the_error_cases_when_the_cell_cannot_fail():
     assert cell_row("num", "x", "NULL", "NULL", "NULL") == ("'n'", "CAST(x AS DOUBLE)", "NULL")
     assert cell_row("txt", "x", "NULL", "NULL", "NULL") == ("'s'", "CAST(NULL AS DOUBLE)", "CAST(x AS VARCHAR)")
-    assert cell_row("bool", "x", "NULL", "NULL", "NULL") == ("'b'", "CAST(x AS DOUBLE)", "NULL")
+    assert cell_row("bool", "x", "NULL", "NULL", "NULL") == ("'b'", "CAST(CAST(x AS INTEGER) AS DOUBLE)", "NULL")
     kind, num_sql, txt_sql = cell_row("num", "x", "e", "NULL", "NULL")
     assert "CASE WHEN e IS NULL" in kind and "CASE WHEN e IS NULL" in num_sql and txt_sql == "e"
 

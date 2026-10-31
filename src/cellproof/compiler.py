@@ -17,7 +17,7 @@ from pathlib import Path
 import cellproof.fn  # noqa: F401  (registers the function library)
 from openpyxl.utils import range_boundaries
 
-from cellproof.expr import (BLANK, CELLS, NO_ERR, Expr, any_of, compare, error, errs, finalize, lit_num, lit_str, num,
+from cellproof.expr import (BLANK, CELLS, NO_ERR, Expr, bool_num, any_of, compare, error, errs, finalize, lit_num, lit_str, num,
                           txt, where_cell)
 from cellproof.fn.dynamic import DYNAMIC, spill_batch
 from cellproof.functions import FUNCS
@@ -510,11 +510,12 @@ def cell_row(typ: str, v: str, e: str, t: str, k: str) -> tuple[str, str, str]:
         return (f"CASE WHEN {e} IS NULL THEN {k} ELSE 'e' END",
                 f"CASE WHEN {e} IS NULL AND {k} <> 's' THEN CAST({v} AS DOUBLE) END",
                 f"CASE WHEN {e} IS NOT NULL THEN {e} WHEN {k} = 's' THEN {t} END")
+    as_num = bool_num(v) if typ == "bool" else f"CAST({v} AS DOUBLE)"  # Postgres has no boolean -> double cast
     if clean:
-        num_sql = "CAST(NULL AS DOUBLE)" if typ in ("txt", "err") else f"CAST({v} AS DOUBLE)"
+        num_sql = "CAST(NULL AS DOUBLE)" if typ in ("txt", "err") else as_num
         return f"'{KIND[typ]}'", num_sql, (f"CAST({v} AS VARCHAR)" if typ == "txt" else "NULL")
     num_sql = ("CAST(NULL AS DOUBLE)" if typ in ("txt", "err")
-               else f"CASE WHEN {e} IS NULL THEN CAST({v} AS DOUBLE) END")
+               else f"CASE WHEN {e} IS NULL THEN {as_num} END")
     txt_sql = f"COALESCE({e}, CAST({v} AS VARCHAR))" if typ == "txt" else e
     return f"CASE WHEN {e} IS NULL THEN '{KIND[typ]}' ELSE 'e' END", num_sql, txt_sql
 

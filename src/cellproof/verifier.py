@@ -74,10 +74,17 @@ def matches(cell: Cell, kind: str, num, txt) -> bool:
 
 
 def verify(book: Book, compiled: Compiled) -> list[Verdict]:
-    got = execute(book, compiled)
+    return verdicts(book, compiled, execute(book, compiled))
+
+
+def verdicts(book: Book, compiled: Compiled, got: dict, blocked: dict | None = None) -> list[Verdict]:
+    """Every cell's verdict from the computed rows; `blocked` cells (not computed, with why) are UNRESOLVED."""
     out = []
     for step in compiled.steps:
         cell = book.cells[step.key]
+        if blocked and step.key in blocked:
+            out.append(Verdict(step.key, "UNRESOLVED", cell.value, None, blocked[step.key]))
+            continue
         kind, n, t = got[step.key]
         if kind == "e" and t in SETTINGS:  # the answer depends on settings the file does not record
             out.append(Verdict(step.key, "UNRESOLVED", cell.value, None, SETTINGS[t]))

@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import math
 
+from cellproof.expr import bool_num
 from cellproof.expr import CELLS, NO_ERR, STALE, UNCHECKED, Expr, any_of, errs, lit_str, num, unify_all, where_area
 from cellproof.fn.criteria import like_pattern
 from cellproof.functions import arity, register
@@ -72,7 +73,7 @@ def _exact(k: str, x: Expr, wild: bool) -> str:
     if x.type == "txt":
         return f"({k}.kind = 's' AND {t})"
     if x.type == "bool":
-        return f"({k}.kind = 'b' AND {k}.num = CAST({x.sql} AS DOUBLE))"
+        return f"({k}.kind = 'b' AND {k}.num = {bool_num(x.sql)})"
     if x.type == "any":
         return (f"(CASE {x.kind} WHEN 'n' THEN {k}.kind = 'n' AND {k}.num = {x.sql} "
                 f"WHEN 's' THEN {k}.kind = 's' AND {t} ELSE {k}.kind = 'b' AND {k}.num = {x.sql} END)")
