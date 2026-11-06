@@ -1,8 +1,38 @@
 # cellproof
 
+[![PyPI](https://img.shields.io/pypi/v/cellproof)](https://pypi.org/project/cellproof/)
+[![tests](https://github.com/Nikhil414/cellproof/actions/workflows/ci.yml/badge.svg)](https://github.com/Nikhil414/cellproof/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/pypi/pyversions/cellproof)](https://pypi.org/project/cellproof/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
 **Turn an Excel workbook into SQL, and prove every number matches.**
 
+<img src="docs/demo.gif" alt="cellproof converting a workbook: every formula checked against Excel's saved value" width="320" align="right">
+
+**Try it in 30 seconds:**
+
+```bash
+pip install cellproof
+curl -LO https://github.com/Nikhil414/cellproof/raw/main/examples/functions.xlsx
+cellproof convert functions.xlsx
+# 74 pass, 0 fail, 2 unresolved -> functions_dbt/REPORT.md
+```
+
+Then open `functions_dbt/REPORT.md`: every formula, the value Excel saved, the value the SQL gave, and why the two
+unresolved cells were not guessed.
+
+- **11,080 cells PASS** on 85 public test workbooks (pycel, formulas, xlcalculator). The 16 FAILs are 10 cells in files LibreOffice saved and 6 last-digit NPV
+  cancellations; none is a wrong translation.
+- **~140 Excel functions**, array formulas, dynamic spills (FILTER, SORT, UNIQUE), Excel tables, LET.
+- **Fast:** 200,000 formulas converted and verified in 26 s.
+- **Local:** workbook values never leave your machine.
+
+Have a workbook cellproof gets wrong? [Open an issue](https://github.com/Nikhil414/cellproof/issues/new) with the
+formula (not your data): that is the most useful contribution there is.
+
 (Released as `unexcel` up to 0.1.0; renamed to cellproof in 0.2.0.)
+
+<br clear="right">
 
 Business logic often lives in a spreadsheet that one person understands. Moving it into a database is risky because
 nobody can show the new numbers equal the old ones. cellproof translates every formula of an `.xlsx` into SQL, runs that
@@ -11,7 +41,7 @@ saved values are a free answer key.
 
 ```
 $ cellproof convert examples/functions.xlsx
-72 pass, 0 fail, 4 unresolved -> examples/functions_dbt/REPORT.md
+74 pass, 0 fail, 2 unresolved -> examples/functions_dbt/REPORT.md
 ```
 
 Every formula cell gets one verdict:
