@@ -101,7 +101,7 @@ def filter_(c, args, sheet: str) -> Rel:
     elif ih == 1 and iw == a.cols:
         pos, other = f"(col_num - {first.c1} + 1)", "j"
     else:
-        return Rel("(SELECT 1 AS i, 1 AS j, 'e' AS kind, NULL AS num, NULL AS txt, '#VALUE!' AS err)", 1, 1)
+        return Rel("(SELECT 1 AS i, 1 AS j, 'e' AS kind, CAST(NULL AS DOUBLE) AS num, CAST(NULL AS VARCHAR) AS txt, '#VALUE!' AS err)", 1, 1)
     keep, kerr = _truth("kind", "num", "txt", "err")
     u = _uid(c)
     ctes = [f"{u}_a AS MATERIALIZED {a.sql}",
@@ -137,7 +137,7 @@ def sort_(c, args, sheet: str) -> Rel:
     if _flag(args[3] if len(args) == 4 else None, "SORT", False):
         raise Unsupported("SORT by columns not supported yet")
     if order not in (1, -1) or idx < 1 or (a.cols is not None and idx > a.cols):
-        return Rel("(SELECT 1 AS i, 1 AS j, 'e' AS kind, NULL AS num, NULL AS txt, '#VALUE!' AS err)", 1, 1)
+        return Rel("(SELECT 1 AS i, 1 AS j, 'e' AS kind, CAST(NULL AS DOUBLE) AS num, CAST(NULL AS VARCHAR) AS txt, '#VALUE!' AS err)", 1, 1)
     d = "ASC" if order == 1 else "DESC"
     u = _uid(c)
     ctes = [f"{u}_a AS MATERIALIZED {a.sql}", f"{u}_k AS MATERIALIZED (SELECT * FROM {u}_a WHERE j = {idx})"]
@@ -206,7 +206,7 @@ def sortby(c, args, sheet: str) -> Rel:
     elif all(by.rows == 1 and by.cols == a.cols for by, _ in pairs):
         axis, across = "j", "i"
     else:
-        return Rel("(SELECT 1 AS i, 1 AS j, 'e' AS kind, NULL AS num, NULL AS txt, '#VALUE!' AS err)", 1, 1)
+        return Rel("(SELECT 1 AS i, 1 AS j, 'e' AS kind, CAST(NULL AS DOUBLE) AS num, CAST(NULL AS VARCHAR) AS txt, '#VALUE!' AS err)", 1, 1)
     u = _uid(c)
     bad = [f"CASE WHEN {order} NOT IN (1, -1) THEN '#VALUE!' END" for _, order in pairs]
     ctes = [f"{u}_a AS MATERIALIZED {a.sql}"]

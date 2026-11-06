@@ -1,6 +1,6 @@
 """Run cellproof on public formula-engine test workbooks. Not a test: run it by hand (needs network and `gh`-free curl).
 
-    python tests/corpus.py DIR
+    python tests/corpus.py DIR [convert options, e.g. --target postgres]
 
 Downloads the .xlsx/.xlsm test files of pycel, formulas and xlcalculator into DIR/corpus (once), converts each into
 DIR/runs, and prints one line per workbook plus the totals. The files are public; nothing is uploaded.
@@ -35,7 +35,7 @@ def main() -> None:
     totals, exits = Counter(), Counter()
     for f in sorted(corpus.rglob("*.xls[xm]")):
         out = runs / f"{f.parent.name}__{f.name}"
-        done = subprocess.run([sys.executable, "-I", "-m", "cellproof", "convert", str(f), "--out", str(out)],
+        done = subprocess.run([sys.executable, "-I", "-m", "cellproof", "convert", str(f), "--out", str(out)] + sys.argv[2:],
                               capture_output=True, text=True, timeout=600)
         exits[done.returncode] += 1
         last = (done.stdout + done.stderr).strip().splitlines()[-1:] or [""]

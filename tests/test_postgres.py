@@ -73,3 +73,40 @@ def test_rounding_ties_go_away_from_zero_on_postgres(con):
                           "A4": ("=ROUND(2.675,2)", 2.68), "A5": ("=MROUND(5,2)", 6.0), "A6": ("=ROUND(0.5,0)", 1.0)}})
     got = {v.key: (v.status, v.actual) for v in postgres.verify(book, compile_book(book), con)}
     assert {s for s, _ in got.values()} == {"PASS"}, got
+
+
+@pytest.mark.parametrize("sql", [
+    "SELECT list_sum(range(1, 5)) AS v",                    # range as a list
+    "SELECT list_sum(range(10, 1, -3)) AS v",                # negative step stops before the end
+    "SELECT sum(x) AS v FROM range(1, 5) AS g(x)",           # range in FROM
+    "SELECT regexp_extract('hello', '(?s)^(.*?)(l)', 1) AS v",
+    "SELECT regexp_extract('hello', 'z', 1) AS v",           # no match: '' as DuckDB, not NULL
+    "SELECT array_to_string(list_transform(list_zip(string_split('ab cD-éx', ''), list_concat([' '], "
+    "string_split('ab cD-éx', ''))), lambda x: CASE WHEN regexp_matches(x[2], '\\p{L}') THEN lower(x[1]) "
+    "ELSE upper(x[1]) END), '') AS v",                       # PROPER
+    "SELECT len(string_split('', '')) AS v",                 # '' splits into ['']
+])
+def test_rewrites_match_duckdb(con, sql):
+    import duckdb
+    assert con.execute(postgres.translate(sql)).fetchall()[0][0] == duckdb.sql(sql).fetchall()[0][0]
+
+
+def test_proper_verifies_on_postgres(con):
+    book = book_of({"S": {"A1": "hello wORLD o'neil", "B1": ("=PROPER(A1)", "Hello World O'Neil"),
+                          "B2": ('=FIND("l",A1)', 3.0), "B3": ('=SEARCH("w*d",A1)', 7.0)}})
+    got = {v.key: (v.status, v.actual) for v in postgres.verify(book, compile_book(book), con)}
+    assert {s for s, _ in got.values()} == {"PASS"}, got
+
+
+
+def test_boolean_index_and_error_spill_on_postgres(con, tmp_path):
+    # formulas' test.xlsx: INDEX of a TRUE/FALSE cell read max(bool) (no such function on Postgres); a spill that is
+    # one error typed its num column as text (CASE text/double mismatch)
+    from cellproof.reader import load
+    path = tmp_path / "b.xlsx"
+    write_xlsx(path, {"S": {"A1": True, "B1": False, "C1": ("=INDEX(A1:B1,1,1)", True),
+                            "D1": ("=INDEX(A1:B1,1,2)", False),
+                            "E1": ("{=_xlfn._xlws.SORT(A1:B1,-1,1)}", "#VALUE!", "E1", "dynamic")}})
+    book = load(path)
+    got = {v.key: (v.status, v.actual, v.reason) for v in postgres.verify(book, compile_book(book), con)}
+    assert {s for s, _, _ in got.values()} == {"PASS"}, got

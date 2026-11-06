@@ -144,6 +144,29 @@ LANGUAGE sql IMMUTABLE AS $$
   SELECT CASE WHEN b <> 0 OR b IS NULL OR a IS NULL THEN a / b WHEN a > 0 THEN 'Infinity'::float8
               WHEN a < 0 THEN '-Infinity'::float8 ELSE 'NaN'::float8 END $$;
 
+-- DuckDB's string_split: '' splits into characters, and '' itself is [''] (string_to_array gives the whole text, {})
+CREATE OR REPLACE FUNCTION pg_temp.cellproof_split(t text, d text) RETURNS text[]
+LANGUAGE sql IMMUTABLE AS $$
+  SELECT CASE WHEN t = '' THEN ARRAY['']::text[] WHEN d = '' THEN regexp_split_to_array(t, '')
+              ELSE string_to_array(t, d) END $$;
+
+-- DuckDB's regexp_extract: group g of the first match, '' when there is none (Postgres's regexp_match gives NULL)
+CREATE OR REPLACE FUNCTION pg_temp.cellproof_regexp_extract(t text, p text, g integer) RETURNS text
+LANGUAGE sql IMMUTABLE AS $$
+  SELECT CASE WHEN t IS NULL OR p IS NULL THEN NULL WHEN g = 0 THEN COALESCE(substring(t from p), '')
+              ELSE COALESCE((regexp_match(t, p))[g], '') END $$;
+
+-- RE2's \p{L} (PROPER's "is a letter"): exact for ASCII and for letters with case; a caseless non-ASCII character
+-- (CJK, Arabic, ...) raises, so its batch is UNRESOLVED rather than guessed
+CREATE OR REPLACE FUNCTION pg_temp.cellproof_is_letter(c text) RETURNS boolean
+LANGUAGE plpgsql IMMUTABLE AS $$
+BEGIN
+  IF c IS NULL THEN RETURN NULL; END IF;
+  IF c ~ '^[\x01-\x7f]$' THEN RETURN c ~ '[A-Za-z]'; END IF;
+  IF lower(c) <> upper(c) THEN RETURN true; END IF;
+  RAISE EXCEPTION 'cellproof: is % a letter? (no Unicode letter class on Postgres)', c;
+END $$;
+
 CREATE OR REPLACE AGGREGATE pg_temp.cellproof_product(double precision) (SFUNC = float8mul, STYPE = double precision);
 """
 
@@ -186,7 +209,7 @@ def _is_array(e) -> bool:
     if isinstance(e, exp.Bracket):  # a slice of a list is a list; one element is not
         return any(isinstance(x, exp.Slice) for x in e.expressions)
     return isinstance(e, (exp.ArrayAgg, exp.Array, exp.Transform, exp.ArrayFilter, exp.ArraySort)) or (
-        isinstance(e, exp.Anonymous) and e.name.lower() in ("string_to_array", "array"))
+        isinstance(e, exp.Anonymous) and e.name.lower() in ("string_to_array", "array", "pg_temp.cellproof_split"))
 
 
 def _unnest(arr, body: str, names, where: str = "", order: str = "i", agg: bool = True):
@@ -230,7 +253,44 @@ def _rewrite(tree):
             if name == "LIST_SUM":  # empty: NULL, as DuckDB
                 return exp.Subquery(this=_unnest(node.expressions[0], "sum(x)", ["x"], order="", agg=False))
             if name == "LIST_ZIP":
-                raise Untranslatable("list_zip (PROPER) has no Postgres form yet")
+                raise Untranslatable("list_zip outside a list_transform has no Postgres form yet")
+        if isinstance(node, (exp.Max, exp.Min)) and isinstance(node.this, (exp.Predicate, exp.Not, exp.Boolean)) \
+                and not node.expressions:  # max/min of TRUE/FALSE: Postgres has only bool_or/bool_and (same values)
+            return exp.Anonymous(this="bool_or" if isinstance(node, exp.Max) else "bool_and", expressions=[node.this])
+        if isinstance(node, exp.RegexpExtract):  # sqlglot parses DuckDB's regexp_extract into this, not Anonymous
+            group = node.args.get("group") or exp.Literal.number(0)
+            return exp.Anonymous(this="pg_temp.cellproof_regexp_extract",
+                                 expressions=[node.this, node.expression, as_int(group)])
+        if isinstance(node, exp.Transform) and isinstance(node.this, exp.Anonymous) and node.this.name.upper() == "LIST_ZIP":
+            # list_transform(list_zip(a, b), lambda x: ... x[1] ... x[2] ...): the two lists side by side
+            body, names = lam(node)
+            x = names[0]
+            body = body.transform(lambda n: exp.column(f"cellproof_z{n.expressions[0].name}")
+                                  if isinstance(n, exp.Bracket) and isinstance(n.this, (exp.Column, exp.Identifier)) and n.this.name == x
+                                  and len(n.expressions) == 1 and isinstance(n.expressions[0], exp.Literal) else n)
+            a, b = node.this.expressions
+            sql = (f"SELECT ARRAY(SELECT {body.sql(dialect=_dialects()[1])} FROM unnest(cellproof_a) WITH ORDINALITY "
+                   f"AS za(cellproof_z1, i) JOIN unnest(cellproof_b) WITH ORDINALITY AS zb(cellproof_z2, j) ON i = j "
+                   f"ORDER BY i)")
+            tree = sqlglot.parse_one(sql, read=_dialects()[1])
+            tree = tree.transform(lambda n: (a if n.name == "cellproof_a" else b).copy()
+                                  if isinstance(n, exp.Column) and n.name in ("cellproof_a", "cellproof_b") else n)
+            return tree.expressions[0]
+        if isinstance(node, exp.RegexpLike) and isinstance(node.expression, exp.Literal) and \
+                node.expression.name in ("\\p{L}", "\\\\p{L}"):
+            return exp.Anonymous(this="pg_temp.cellproof_is_letter", expressions=[node.this])
+        if isinstance(node, exp.GenerateSeries) and node.args.get("is_end_exclusive"):
+            # DuckDB's range(a, b[, s]) stops before b: the last value is b - sign(s) (sqlglot wrote b - 1, wrong for a
+            # negative step); used as a value (unnest(range(...))) it is a list, in FROM a set
+            start, end, step = node.args["start"], node.args["end"], node.args.get("step")
+            last = (exp.Sub(this=end, expression=exp.Literal.number(1)) if step is None else
+                    as_int(exp.Sub(this=end, expression=exp.Anonymous(this="sign", expressions=[step.copy()]))))  # sign() is float8
+            series = exp.Anonymous(this="generate_series", expressions=[start, last] + ([step] if step is not None else []))
+            in_from = node.find_ancestor(exp.From, exp.Join) is not None and node.find_ancestor(exp.Unnest) is None
+            if in_from:
+                return series
+            return sqlglot.parse_one("SELECT ARRAY(SELECT * FROM generate_series(1, 1))", read=_dialects()[1]) \
+                .expressions[0].transform(lambda n: series.copy() if isinstance(n, exp.GenerateSeries) else n)
         if isinstance(node, exp.Transform):
             body, names = lam(node)
             return _unnest(node.this, body.sql(dialect=_dialects()[1]), names)
@@ -288,7 +348,7 @@ def _rewrite(tree):
         if isinstance(node, exp.DateFromParts):
             return exp.Anonymous(this="make_date", expressions=[as_int(node.args[k]) for k in ("year", "month", "day")])
         if isinstance(node, exp.Split):
-            return exp.Anonymous(this="string_to_array", expressions=[node.this, node.expression])
+            return exp.Anonymous(this="pg_temp.cellproof_split", expressions=[node.this, node.expression])
         if isinstance(node, exp.Select) and len(node.expressions) == 1:
             agg = node.expressions[0].unalias()
             if isinstance(agg, (exp.ArgMax, exp.ArgMin)) and not node.args.get("group"):
