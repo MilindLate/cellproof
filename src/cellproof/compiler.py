@@ -530,6 +530,11 @@ def render_batch(steps: list[Step], prev: str, own_only: bool = False) -> str:
         typ = s.expr.type
         v, e, t, k = (f"(SELECT {c} FROM {s.cte})" for c in "vetk")
         kind, num_sql, txt_sql = cell_row(typ, v, e, t, k)
+        if typ in ("num", "any"):
+            chk_num = num_sql if typ == "num" else f"(CASE WHEN {k} <> 's' THEN {num_sql} END)"
+            kind = f"(CASE WHEN ({chk_num}) IS NOT NULL AND NOT isfinite({chk_num}) THEN 'e' ELSE {kind} END)"
+            txt_sql = f"(CASE WHEN ({chk_num}) IS NOT NULL AND NOT isfinite({chk_num}) THEN '#NUM!' ELSE {txt_sql} END)"
+            num_sql = f"(CASE WHEN ({chk_num}) IS NOT NULL AND NOT isfinite({chk_num}) THEN NULL ELSE {num_sql} END)"
         rows.append(f"SELECT {lit_str(sheet).sql}, {row}, {col}, {kind}, {num_sql}, {txt_sql}")
     head = "" if own_only else f"SELECT * FROM {CELLS}\nUNION ALL\n"
     sql = f"WITH\n{ctes}\n{head}" + "\nUNION ALL\n".join(rows)

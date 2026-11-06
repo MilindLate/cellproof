@@ -90,3 +90,23 @@ def test_error_codes_must_match_exactly():
     assert not matches(cell, "e", None, "#DIV/0!")
     assert not matches(cell, "n", None, None)
     assert not matches(Cell("S", 1, 1, "x", 1.0, "n"), "e", None, "#N/A")
+
+
+def test_arithmetic_overflow_produces_num_error():
+    from cellproof.verifier import verify
+
+    book = book_of({
+        "S": {
+            "A1": 1e308,
+            "B1": ("=A1*10", "#NUM!"),
+            "B2": ("=A1+A1", "#NUM!"),
+            "B3": ("=-A1-A1", "#NUM!"),
+            "B4": ("=A1/1e-10", "#NUM!"),
+            "B5": ("=1e100^10", "#NUM!"),
+        }
+    })
+    compiled = compile_book(book)
+    assert compiled.unresolved == {}
+    verdicts = verify(book, compiled)
+    assert len(verdicts) == 5
+    assert all(v.status == "PASS" and v.actual == "#NUM!" for v in verdicts)
