@@ -336,7 +336,7 @@ def hex2dec(c, args, sheet):
     bad = f"NOT regexp_matches({t.sql}, '^[0-9A-Fa-f]{{1,10}}$')"
     sql = (f"(SELECT CASE WHEN NOT regexp_matches(st, '^[0-9A-Fa-f]{{1,10}}$') THEN NULL "
            f"WHEN length(st) = 10 AND upper(substr(st, 1, 1)) IN ('8','9','A','B','C','D','E','F') "
-           f"THEN CAST(TRY_CAST('0x' || st AS HUGEINT) - 1099511627776 AS DOUBLE) "
+           f"THEN CAST(TRY_CAST('0x' || st AS BIGINT) - 1099511627776 AS DOUBLE) "
            f"ELSE CAST(TRY_CAST('0x' || st AS BIGINT) AS DOUBLE) END "
            f"FROM (SELECT {t.sql} AS st) hex_args)")
     return Expr(sql, "num", errs(t.err, f"(CASE WHEN {bad} THEN '#NUM!' END)"))
