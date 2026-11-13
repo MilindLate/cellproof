@@ -307,12 +307,14 @@ def _dec2base(name: str, radix: int, min_val: int, max_val: int, offset: int):
         n = _n(c, args[0], sheet)
         num_bad = f"(trunc({n.sql}) < {min_val} OR trunc({n.sql}) > {max_val})"
         if len(args) == 2:
-            p = _n(c, args[1], sheet)
+            raw_p = c.expr(args[1], sheet) if args[1] is not None else BLANK
+            p = num(raw_p)
             tp = f"TRY_CAST(trunc({p.sql}) AS INTEGER)"
             safe_p = f"least(greatest(COALESCE({tp}, 0), 0), 10)"
             p_bad = (f"({n.sql} >= 0 AND ({tp} IS NULL OR {tp} < 1 OR {tp} > 10 OR "
                      f"length(to_base(CAST(greatest(0, trunc(least({n.sql}, {max_val}))) AS BIGINT), {radix})) > {tp}))")
-            err = errs(n.err, p.err, f"(CASE WHEN {num_bad} OR {p_bad} THEN '#NUM!' END)")
+            odd = f"(CASE WHEN {n.sql} < 0 AND ({p.err} = '#VALUE!' OR {tp} IS NULL OR {tp} < 1 OR {tp} > 10) THEN '{UNCHECKED}' END)"
+            err = errs(n.err, raw_p.err, odd, p.err, f"(CASE WHEN {num_bad} OR {p_bad} THEN '#NUM!' END)")
         else:
             safe_p = "0"
             p_bad = "FALSE"
@@ -339,7 +341,7 @@ def hex2dec(c, args, sheet):
            f"THEN CAST(TRY_CAST('0x' || st AS BIGINT) - 1099511627776 AS DOUBLE) "
            f"ELSE CAST(TRY_CAST('0x' || st AS BIGINT) AS DOUBLE) END "
            f"FROM (SELECT {t.sql} AS st) hex_args)")
-    return Expr(sql, "num", errs(t.err, f"(CASE WHEN {bad} THEN '#NUM!' END)"))
+    return Expr(sql, "num", errs(t.err, f"(CASE WHEN {t.sql} = '' THEN '{UNCHECKED}' WHEN {bad} THEN '#NUM!' END)"))
 
 
 @register("BIN2DEC")
@@ -352,7 +354,7 @@ def bin2dec(c, args, sheet):
            f"THEN CAST(TRY_CAST('0b' || st AS BIGINT) - 1024 AS DOUBLE) "
            f"ELSE CAST(TRY_CAST('0b' || st AS BIGINT) AS DOUBLE) END "
            f"FROM (SELECT {t.sql} AS st) bin_args)")
-    return Expr(sql, "num", errs(t.err, f"(CASE WHEN {bad} THEN '#NUM!' END)"))
+    return Expr(sql, "num", errs(t.err, f"(CASE WHEN {t.sql} = '' THEN '{UNCHECKED}' WHEN {bad} THEN '#NUM!' END)"))
 
 
 @register("OCT2DEC")
@@ -367,4 +369,4 @@ def oct2dec(c, args, sheet):
            f"ELSE CAST(val AS DOUBLE) END "
            f"FROM (SELECT st, {terms} AS val "
            f"FROM (SELECT {t.sql} AS st, lpad({t.sql}, 10, '0') AS p) oct_inner) oct_outer)")
-    return Expr(sql, "num", errs(t.err, f"(CASE WHEN {bad} THEN '#NUM!' END)"))
+    return Expr(sql, "num", errs(t.err, f"(CASE WHEN {t.sql} = '' THEN '{UNCHECKED}' WHEN {bad} THEN '#NUM!' END)"))

@@ -39,6 +39,10 @@ CASES = [  # formula, Excel's answer (Microsoft's function reference)
     ('=OCT2DEC("72")', 58), ('=OCT2DEC("7777777777")', -1), ('=OCT2DEC("4000000000")', -536870912),
     ('=OCT2DEC("3777777777")', 536870911), ('=OCT2DEC("77777777777")', "#NUM!"),
     ('=OCT2DEC("78")', "#NUM!"), ('=OCT2DEC(72)', 58),
+    ('=HEX2DEC("")', "#UNCHECKED"), ('=BIN2DEC("")', "#UNCHECKED"), ('=OCT2DEC("")', "#UNCHECKED"),
+    ('=DEC2HEX(-1,0)', "#UNCHECKED"), ('=DEC2BIN(-1,11)', "#UNCHECKED"), ('=DEC2OCT(-1,"x")', "#UNCHECKED"),
+    ('=HEX2DEC(" A5")', "#NUM!"), ('=HEX2DEC("+A5")', "#NUM!"),
+    ('=HEX2DEC(S!Z1)', "#UNCHECKED"), ('=DEC2HEX(-1,1/0)', "#DIV/0!"),
 ]
 
 
