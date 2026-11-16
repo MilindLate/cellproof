@@ -1,7 +1,18 @@
 # Changelog
 
-## Unreleased
+## 1.0.0 (2026-11-17)
 
+- **Postgres target:** `cellproof convert book.xlsx --target postgres [--pg-url URL] [--dbt]`. Every cell is verified
+  on DuckDB, then again on Postgres with the SQL translated (sqlglot, tree rewrites, and `pg_temp` helper functions with
+  DuckDB's semantics). On the 85 public test workbooks Postgres gives the same verdicts as DuckDB: 11,080 PASS, the
+  same 16 FAIL, none new. A batch that does not translate or run makes its cells UNRESOLVED, and the book is compiled
+  again so every cell reading them is too: the dbt project only holds SQL that ran on Postgres.
+- **dbt-postgres project:** with `--target postgres` the generated project targets dbt-postgres. Its helpers are
+  created in the target schema by an `on-run-start` macro, and `profiles.yml` reads `CELLPROOF_PG_*` environment
+  variables. `--dbt` runs `dbt build` on the Postgres that verified the workbook. New extras: `postgres`,
+  `dbt-postgres`.
+- **Browser playground** (https://nikhil414.github.io/cellproof/): drop a workbook, get every verdict and the dbt
+  project, in the page (Pyodide, DuckDB 1.2); nothing is uploaded. CONCAT and TEXTJOIN no longer need DuckDB 1.3.
 - **The console says what to fix first.** After the counts line, every conversion prints the top five unresolved
   reasons ranked by how many cells each blocks ("Where to start"), the same ranking `REPORT.md` has always carried -
   so a long list of unfinished cells no longer needs the report opened to be useful. `--stats` still adds the full
@@ -11,6 +22,8 @@
   by", not "blocks"): a reader may add a difference of its own, so the list is a neighbourhood, not a guarantee.
   The reverse pass reuses the compile's tokenizing and costs one bisect per column, so whole-column references stay
   cheap.
+- Add DEC2BIN, DEC2HEX, DEC2OCT and their reverse conversions; unverified edge cases remain UNRESOLVED.
+- CI: a Postgres 16 service runs the Postgres tests and dbt build on every push.
 
 ## 0.6.1 (2026-10-31)
 
