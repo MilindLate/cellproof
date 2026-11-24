@@ -86,8 +86,17 @@ def test_what_excel_was_not_asked_is_not_guessed(tmp_path):
         **spill("L6", "_xlfn._xlws.SORT(G1:G3)", [[0.0], [0.0], [1.0]]),
         "J9": ("=_xlfn._xlws.FILTER(A2:A5,C2:C5>50)", "Asha"),           # not an array formula
         "J10": ("=COUNT(_xlfn.TOCOL(_xlfn._xlws.SORT(H1:H1),2))", 0.0), # preserves UNCHECKED marker
+        # DROP past the end of a FILTER result: the array's size is known only at run time, so whether this empties
+        # it is too. An empty relation answered 0.0 from SUM and COUNT, which is a wrong number, not an error.
+        "J11": ("=SUM(_xlfn.DROP(_xlfn._xlws.FILTER(A2:C5,C2:C5>50),3))", "#CALC!"),
+        "J12": ("=COUNT(_xlfn.DROP(_xlfn._xlws.FILTER(A2:C5,C2:C5>50),3))", "#CALC!"),
+        "J13": ("=ROWS(_xlfn.DROP(_xlfn._xlws.FILTER(A2:C5,C2:C5>50),3))", "#CALC!"),
+        "J14": ("=SUM(_xlfn.DROP(_xlfn._xlws.FILTER(A2:C5,C2:C5>50),,3))", "#CALC!"),
+        # ... but a DROP that leaves rows behind is still answered
+        "J15": ("=SUM(_xlfn.DROP(_xlfn._xlws.FILTER(A2:C5,C2:C5>50),1))", 60.0),
     })
-    assert set(bad) == {("S", 6, 10), ("S", 6, 11), ("S", 6, 12), ("S", 7, 12), ("S", 8, 12), ("S", 9, 10), ("S", 10, 10)}
+    assert set(bad) == {("S", 6, 10), ("S", 6, 11), ("S", 6, 12), ("S", 7, 12), ("S", 8, 12), ("S", 9, 10), ("S", 10, 10),
+                        ("S", 11, 10), ("S", 12, 10), ("S", 13, 10), ("S", 14, 10)}
     assert all(v[0] == "UNRESOLVED" for v in bad.values())
 
 

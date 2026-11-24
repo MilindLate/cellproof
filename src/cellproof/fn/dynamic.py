@@ -374,6 +374,16 @@ def drop_(c, args, sheet: str) -> Rel:
             out_cols = keep_cols
 
     sql = f"(SELECT {i_sel}, {j_sel}, a.kind, a.num, a.txt, a.err FROM {a.sql} a WHERE {' AND '.join(conds)})"
+    if a.rows is None or a.cols is None:
+        # The array's size is only known at run time, so whether this DROP empties it is too. An empty relation is
+        # not an answer: Excel documents #CALC! for dropping everything, but a real Excel-saved file disagreed with
+        # Microsoft's docs on FILTER's empty case, so the error code here is a guess and is not made. The empty case
+        # becomes UNCHECKED, which reads as UNRESOLVED - the same rule FILTER follows. Without this, DROP past the
+        # end of a FILTER result answered an empty relation, and SUM over it said 0.0 instead of raising.
+        u = _uid(c)
+        ctes = [f"{u}_d AS MATERIALIZED {sql}"]
+        empty = f"SELECT 1, 1, 'e', NULL, NULL, '{UNCHECKED}'"
+        return Rel(_whole(u, ctes, f"(SELECT * FROM {u}_d)", "CAST(NULL AS VARCHAR)", empty), out_rows, out_cols)
     return Rel(sql, out_rows, out_cols)
 
 
