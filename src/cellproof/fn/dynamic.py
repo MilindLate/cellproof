@@ -249,8 +249,16 @@ def sequence(c, args, sheet: str) -> Rel:
     return Rel(_whole(u, [], body, bad), None, None)
 
 
+PROVISIONAL = ("the boundary error codes below (#CALC! for a zero count, #VALUE! for a bad index) come from "
+               "Microsoft's docs, not an Excel-saved workbook: real Excel contradicted the docs on FILTER's empty "
+               "case, so treat these as unproven. They are safe to get wrong - neither code is #N/A, so no supported "
+               "function can tell them apart and no branch can move; only the name printed on the failing cell could.")
+
+
 def take_(c, args, sheet: str) -> Rel:
-    """TAKE(array, [rows], [cols]): take the first rows rows (and cols cols when given)."""
+    """TAKE(array, [rows], [cols]): take the first rows rows (and cols cols when given).
+
+    PROVISIONAL: see the note there."""
     if not 2 <= len(args) <= 3:
         raise Unsupported("TAKE needs two or three arguments")
     a = relation(c, args[0], sheet)
@@ -310,7 +318,9 @@ def take_(c, args, sheet: str) -> Rel:
 
 
 def drop_(c, args, sheet: str) -> Rel:
-    """DROP(array, [rows], [cols]): drop the first rows rows (and cols cols when given)."""
+    """DROP(array, [rows], [cols]): drop the first rows rows (and cols cols when given).
+
+    PROVISIONAL: see the note there."""
     if not 2 <= len(args) <= 3:
         raise Unsupported("DROP needs two or three arguments")
     a = relation(c, args[0], sheet)
@@ -388,7 +398,9 @@ def drop_(c, args, sheet: str) -> Rel:
 
 
 def chooserows_(c, args, sheet: str) -> Rel:
-    """CHOOSEROWS(array, row_num1, [row_num2], ...): rows picked in the given order."""
+    """CHOOSEROWS(array, row_num1, [row_num2], ...): rows picked in the given order.
+
+    PROVISIONAL: see the note there."""
     if len(args) < 2:
         raise Unsupported("CHOOSEROWS needs at least two arguments")
     a = relation(c, args[0], sheet)
@@ -435,7 +447,9 @@ def chooserows_(c, args, sheet: str) -> Rel:
 
 
 def choosecols_(c, args, sheet: str) -> Rel:
-    """CHOOSECOLS(array, col_num1, [col_num2], ...): columns picked in the given order."""
+    """CHOOSECOLS(array, col_num1, [col_num2], ...): columns picked in the given order.
+
+    PROVISIONAL: see the note there."""
     if len(args) < 2:
         raise Unsupported("CHOOSECOLS needs at least two arguments")
     a = relation(c, args[0], sheet)

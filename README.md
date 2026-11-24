@@ -318,8 +318,13 @@ cellproof prefers an honest UNRESOLVED or FAIL to a guess. Known limits, each re
   and `@` are read. **FILTER, SORT and UNIQUE** spill their results and nest in each other; a dynamic spill whose
   result is not exactly as big as the block Excel saved shows #SPILL! in its first cell (a FAIL). The generated SQL
   computes the block Excel saved: if the data later changes the size of a FILTER's result, re-run cellproof.
-  SORTBY, SEQUENCE and XMATCH too, and all of them inside aggregates (`SUM(FILTER(...))`, `ROWS(UNIQUE(...))`).
-  Not yet: TAKE/DROP/CHOOSECOLS and the other array functions, these functions inside other non-aggregate
+  SORTBY, SEQUENCE, TAKE, DROP, CHOOSEROWS, CHOOSECOLS, TOCOL, TOROW and XMATCH too, and all of them inside
+  aggregates (`SUM(FILTER(...))`, `ROWS(UNIQUE(...))`). A count past the end of the array is clamped for `TAKE`, while
+  `DROP` raises when it would empty the array - and the boundary error codes (a zero count, an index of zero or one
+  past the end) follow Microsoft's documentation rather than an Excel-saved workbook, so they are the one unproven
+  part of this group; they are also unobservable to any other function here, since none of the candidate codes is
+  `#N/A`, so at worst one cell reports an error under the wrong name.
+  Not yet: these functions inside other non-aggregate
   calculations, SORT by several keys or by columns (SORTBY does both), SORT/SORTBY keys that are empty, errors or text
   with punctuation (Excel's own text order), UNIQUE over empty cells or errors - all UNRESOLVED.
 - **Array arithmetic in aggregates** (`SUM(A1:A10*B1:B10)`, `SUMPRODUCT((A1:A9>5)*C1:C9)`, `MAX(IF(A1:A9="x",B1:B9))`,
